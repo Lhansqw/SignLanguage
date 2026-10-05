@@ -18,7 +18,11 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import java.util.concurrent.Executors
 
 @Composable
-fun CameraPreview(modifier: Modifier = Modifier, onFrame: (ImageProxy) -> Unit) {
+fun CameraPreview(
+    modifier: Modifier = Modifier,
+    isFrontCamera: Boolean = true,
+    onFrame: (ImageProxy) -> Unit
+) {
     val lifecycleOwner = LocalLifecycleOwner.current
     val currentOnFrame by rememberUpdatedState(onFrame)
     val executor = remember { Executors.newSingleThreadExecutor() }
@@ -29,10 +33,19 @@ fun CameraPreview(modifier: Modifier = Modifier, onFrame: (ImageProxy) -> Unit) 
         }
     }
 
+    val cameraSelector = if (isFrontCamera) {
+        CameraSelector.DEFAULT_FRONT_CAMERA
+    } else {
+        CameraSelector.DEFAULT_BACK_CAMERA
+    }
+
     AndroidView(
         modifier = modifier,
         factory = { ctx ->
-            val previewView = PreviewView(ctx).apply { scaleType = PreviewView.ScaleType.FIT_CENTER }
+            PreviewView(ctx).apply { scaleType = PreviewView.ScaleType.FIT_CENTER }
+        },
+        update = { previewView ->
+            val ctx = previewView.context
             val future = ProcessCameraProvider.getInstance(ctx)
             future.addListener({
                 val provider = future.get()
@@ -44,12 +57,15 @@ fun CameraPreview(modifier: Modifier = Modifier, onFrame: (ImageProxy) -> Unit) 
                     .build()
                     .also { it.setAnalyzer(executor) { proxy -> currentOnFrame(proxy) } }
 
-                provider.unbindAll()
-                provider.bindToLifecycle(
-                    lifecycleOwner, CameraSelector.DEFAULT_FRONT_CAMERA, preview, analysis
-                )
+                try {
+                    provider.unbindAll()
+                    provider.bindToLifecycle(
+                        lifecycleOwner, cameraSelector, preview, analysis
+                    )
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
             }, ContextCompat.getMainExecutor(ctx))
-            previewView
         }
     )
 }

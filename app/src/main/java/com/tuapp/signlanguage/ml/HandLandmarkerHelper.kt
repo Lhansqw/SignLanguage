@@ -23,29 +23,39 @@ class HandLandmarkerHelper(
     context: Context,
     private val onResult: (HandResult) -> Unit
 ) {
-    private val landmarker: HandLandmarker
+    private var landmarker: HandLandmarker? = null
     @Volatile private var lastW = 1
     @Volatile private var lastH = 1
 
     init {
-        val options = HandLandmarker.HandLandmarkerOptions.builder()
-            .setBaseOptions(BaseOptions.builder().setModelAssetPath("hand_landmarker.task").build())
-            .setNumHands(2)
-            .setRunningMode(RunningMode.LIVE_STREAM)
-            .setResultListener { result, _ ->
-                val hands = result.landmarks().map { hand -> hand.map { PointF(it.x(), it.y()) } }
-                val prediction = if (hands.isNotEmpty()) {
-                    SignClassifier.classify(hands[0])
-                } else {
-                    SignPrediction("No hay mano", 0f)
+        try {
+            val options = HandLandmarker.HandLandmarkerOptions.builder()
+                .setBaseOptions(BaseOptions.builder().setModelAssetPath("hand_landmarker.task").build())
+                .setNumHands(2)
+                .setRunningMode(RunningMode.LIVE_STREAM)
+                .setResultListener { result, _ ->
+                    val hands = result.landmarks().map { hand -> hand.map { PointF(it.x(), it.y()) } }
+                    val prediction = if (hands.isNotEmpty()) {
+                        SignClassifier.classify(hands[0])
+                    } else {
+                        SignPrediction("No hay mano", 0f)
+                    }
+                    onResult(HandResult(hands, lastW, lastH, prediction))
                 }
-                onResult(HandResult(hands, lastW, lastH, prediction))
-            }
-            .build()
-        landmarker = HandLandmarker.createFromOptions(context, options)
+                .build()
+            landmarker = HandLandmarker.createFromOptions(context, options)
+        } catch (e: Throwable) {
+            e.printStackTrace()
+            onResult(HandResult(prediction = SignPrediction("Error al cargar IA: ${e.localizedMessage ?: "librerías no encontradas"}", 0f)))
+        }
     }
 
     fun detect(imageProxy: ImageProxy, isFrontCamera: Boolean) {
+        val lm = landmarker
+        if (lm == null) {
+            imageProxy.close()
+            return
+        }
         try {
             val bitmap = imageProxy.toBitmap()
             val matrix = Matrix().apply {
@@ -56,7 +66,7 @@ class HandLandmarkerHelper(
             lastW = rotated.width
             lastH = rotated.height
 
-            landmarker.detectAsync(BitmapImageBuilder(rotated).build(), SystemClock.uptimeMillis())
+            lm.detectAsync(BitmapImageBuilder(rotated).build(), SystemClock.uptimeMillis())
 
             if (rotated != bitmap) {
                 bitmap.recycle()
@@ -68,5 +78,11 @@ class HandLandmarkerHelper(
         }
     }
 
-    fun close() = landmarker.close()
+    fun close() {
+        try {
+            landmarker?.close()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
 }
