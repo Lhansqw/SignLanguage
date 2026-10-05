@@ -128,7 +128,7 @@ fun SignLanguageScreen() {
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     LinearProgressIndicator(
-                        progress = { result.prediction.confidence },
+                        progress = result.prediction.confidence,
                         modifier = Modifier
                             .weight(1f)
                             .height(8.dp),

@@ -7,10 +7,12 @@
 /.idea/caches
 /.idea/deploymentTargetSelector.xml
 /.idea/deviceManager.xml
-/.idea/vcs.xml
+/.idea/compiler.xml
+/.idea/migrations.xml
 .DS_Store
-/build
-/captures
+build/
+**/build/
+captures/
 .externalNativeBuild
 .cxx
 local.properties
